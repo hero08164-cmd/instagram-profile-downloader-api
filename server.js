@@ -12,11 +12,11 @@ app.get("/", (req, res) => {
     res.json({ status: "online", message: "Instagram Reels Heavy Engine Core Live, Surya Kumar Boss!" });
 });
 
-// Step 1: Username se User ID auto-fetch karne wala helper
+// Step 1: Username se User ID nikalne wala helper
 async function getUserId(username) {
     const options = {
         method: 'GET',
-        url: `https://${RAPIDAPI_HOST}/profile`,   // "User info by username" ka actual path
+        url: `https://${RAPIDAPI_HOST}/profile`,
         params: { username },
         headers: {
             'x-rapidapi-key': RAPIDAPI_KEY,
@@ -26,9 +26,8 @@ async function getUserId(username) {
     const response = await axios.request(options);
     const data = response.data;
 
-    console.log("PROFILE RAW RESPONSE:", JSON.stringify(data)); // debug ke liye Render logs me dikhega
+    console.log("PROFILE RAW RESPONSE:", JSON.stringify(data));
 
-    // Sabhi possible field names try karo jahan ID ho sakti hai
     return (
         data.pk ||
         data.id ||
@@ -50,21 +49,43 @@ async function getReelsById(userId, count = 12) {
         }
     };
     const response = await axios.request(options);
+    console.log("REELS RAW RESPONSE:", JSON.stringify(response.data));
     return response.data;
 }
 
+// Har tarah ke possible response structure ko try karne wala parser
 function extractReelLinks(data) {
     let reelLinks = [];
-    const items = data.items || (data.data && data.data.items) || [];
-    items.forEach(item => {
-        if (item.video_versions && item.video_versions.length) {
-            reelLinks.push(item.video_versions[0].url);
-        }
+
+    // Sabhi possible jagah jahan items/array ho sakta hai
+    const possibleArrays = [
+        data.items,
+        data.medias,
+        data.reels,
+        data.data && data.data.items,
+        data.data && data.data.medias,
+        data.data && data.data.reels,
+        Array.isArray(data.data) ? data.data : null,
+        Array.isArray(data) ? data : null
+    ].filter(Boolean);
+
+    const list = possibleArrays.find(arr => Array.isArray(arr) && arr.length > 0) || [];
+
+    list.forEach(item => {
+        // Video URL nikalne ke sabhi common tareeke try karo
+        const videoUrl =
+            (item.video_versions && item.video_versions[0] && item.video_versions[0].url) ||
+            item.video_url ||
+            item.video ||
+            (item.media && item.media.video_url) ||
+            (item.clips_metadata && item.clips_metadata.video_url);
+
+        if (videoUrl) reelLinks.push(videoUrl);
     });
+
     return reelLinks;
 }
 
-// 🔥 BROWSER TEST ROUTE — sirf profile URL do, ID khud fetch ho jayegi
 app.get("/test_reels", async (req, res) => {
     const { url } = req.query;
     if (!url) return res.status(400).json({ status: "error", message: "Boss, '?url=...' missing hai!" });
@@ -78,7 +99,7 @@ app.get("/test_reels", async (req, res) => {
         if (!userId) {
             return res.status(500).json({
                 status: "error",
-                message: "User ID nahi mila. Render logs me 'PROFILE RAW RESPONSE' check karo, wahi se exact field pata chalega."
+                message: "User ID nahi mila. Render logs me 'PROFILE RAW RESPONSE' check karo."
             });
         }
 
@@ -90,14 +111,15 @@ app.get("/test_reels", async (req, res) => {
             username_detected: username,
             user_id: userId,
             count: reelLinks.length,
-            links: reelLinks
+            links: reelLinks,
+            // Debug ke liye: agar links khali hain to raw response bhi bhej do
+            debug_raw: reelLinks.length === 0 ? data : undefined
         });
     } catch (error) {
         return res.status(500).json({ status: "error", message: `Engine Crash: ${error.message}` });
     }
 });
 
-// 🔥 POST ROUTE (bulk/backend use ke liye) — same auto-ID logic
 app.post("/instagram_profile_links", async (req, res) => {
     const { url } = req.body;
     if (!url) return res.status(400).json({ status: "error", message: "Profile URL missing boss!" });
