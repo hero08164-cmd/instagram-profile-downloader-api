@@ -73,12 +73,14 @@ function extractReelLinks(data) {
 
     list.forEach(item => {
         // Video URL nikalne ke sabhi common tareeke try karo
-        const videoUrl =
-            (item.video_versions && item.video_versions[0] && item.video_versions[0].url) ||
-            item.video_url ||
-            item.video ||
-            (item.media && item.media.video_url) ||
-            (item.clips_metadata && item.clips_metadata.video_url);
+        // Is line ko extractReelLinks function ke videoUrl check me add kar dena boss:
+const videoUrl =
+    (item.media && item.media.video_versions && item.media.video_versions[0] && item.media.video_versions[0].url) || // 🔥 Sahi Structure
+    (item.video_versions && item.video_versions[0] && item.video_versions[0].url) ||
+    item.video_url ||
+    item.video ||
+    (item.media && item.media.video_url) ||
+    (item.clips_metadata && item.clips_metadata.video_url);
 
         if (videoUrl) reelLinks.push(videoUrl);
     });
